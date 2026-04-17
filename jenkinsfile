@@ -35,8 +35,10 @@ pipeline {
                 withSonarQubeEnv('sonar-server') {
                     sh """
                     $SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectKey=Swiggy \
                     -Dsonar.projectName=Swiggy \
-                    -Dsonar.projectKey=Swiggy
+                    -Dsonar.sources=. \
+                    -Dsonar.host.url=http://localhost:9000
                     """
                 }
             }
@@ -52,7 +54,7 @@ pipeline {
             }
         }
 
-        // Optional (slow) → disable for now
+        // Disabled for speed
         stage('OWASP Scan') {
             when {
                 expression { return false }
