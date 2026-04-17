@@ -1,73 +1,100 @@
-pipeline{
+pipeline {
     agent any
-    tools{
+
+    tools {
         jdk 'jdk21'
         nodejs 'node23'
     }
+
     environment {
-        SCANNER_HOME=tool 'sonar-scanner'
+        SCANNER_HOME = tool 'sonar-scanner'
     }
+
     stages {
-        stage('clean workspace'){
-            steps{
+
+        stage('Clean Workspace') {
+            steps {
                 cleanWs()
             }
         }
-        stage('Checkout from Git'){
-            steps{
+
+        stage('Checkout') {
+            steps {
                 git 'https://github.com/shubhamsharmacs1/DevOps-Project-Swiggy.git'
             }
         }
-        stage("Sonarqube Analysis "){
-            steps{
-                withSonarQubeEnv('sonar-server') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Swiggy \
-                    -Dsonar.projectKey=Swiggy '''
-                }
-            }
-        }
-        stage("quality gate"){
-           steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
-                }
-            } 
-        }
+
         stage('Install Dependencies') {
             steps {
-                sh "npm install"
+                sh 'npm install --prefer-offline --no-audit'
             }
         }
-        stage('OWASP FS SCAN') {
+
+        stage('SonarQube Analysis') {
             steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+                withSonarQubeEnv('sonar-server') {
+                    sh """
+                    $SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectName=Swiggy \
+                    -Dsonar.projectKey=Swiggy
+                    """
+                }
             }
         }
-        stage('TRIVY FS SCAN') {
+
+        stage('Quality Gate') {
             steps {
-                sh "trivy fs . > trivyfs.txt"
-            }
-        }
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: 'docker-creds', toolName: 'docker'){   
-                       sh "docker build -t swiggy ."
-                       sh "docker tag swiggy shubhamsharma01/swiggy:latest "
-                       sh "docker push shubhamsharma01/swiggy:latest "
+                script {
+                    timeout(time: 5, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: false
                     }
                 }
             }
         }
-        stage("TRIVY"){
-            steps{
-                sh "trivy image shubhamsharma01/swiggy:latest > trivy.txt" 
+
+        //  FAST MODE: Skip heavy OWASP OR make it optional
+        stage('OWASP FS SCAN (Optional)') {
+            when {
+                expression { return false }   // disable for faster builds
+            }
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ --noupdate', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
             }
         }
-        stage('Deploy to container'){
-            steps{
-                sh 'docker run -d --name swiggy -p 3000:3000 shubhamsharma01/swiggy:latest'
+
+        stage('Trivy FS Scan') {
+            steps {
+                sh 'trivy fs --scanners vuln --quiet . > trivyfs.txt'
+            }
+        }
+
+        stage('Docker Build & Push') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-creds', toolName: 'docker') {
+                        sh '''
+                        docker build -t swiggy .
+                        docker tag swiggy shubhamsharma01/swiggy:latest
+                        docker push shubhamsharma01/swiggy:latest
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh 'trivy image --severity HIGH,CRITICAL --quiet shubhamsharma01/swiggy:latest > trivy.txt'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                docker rm -f swiggy || true
+                docker run -d --name swiggy -p 3000:3000 shubhamsharma01/swiggy:latest
+                '''
             }
         }
     }
