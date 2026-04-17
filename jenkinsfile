@@ -43,14 +43,14 @@ pipeline {
     }
 }
 
-       # stage('Quality Gate') {
-        #    steps {
-         #       script {
-          #             waitForQualityGate abortPipeline: false
-           #         }
-            #    }
-           # }
-       # }
+       \\ stage('Quality Gate') {
+        \\    steps {
+         \\       script {
+          \\             waitForQualityGate abortPipeline: false
+           \\         }
+            \\    }
+           \\ }
+       \\ }
 
         // Disabled for speed
         stage('OWASP Scan') {
