@@ -65,7 +65,7 @@ pipeline {
 
         stage('Trivy FS Scan') {
             steps {
-                sh 'trivy fs --quiet . > trivyfs.txt'
+                sh '/usr/bin/trivy fs . > trivyfs.txt'
             }
         }
 
