@@ -91,7 +91,7 @@ pipeline {
             steps {
                 sh '''
                 docker rm -f swiggy || true
-                docker run -d --name swiggy -p 3000:3000 shubhamsharma01/swiggy:latest
+                docker run -d --name swiggy -p 3002:3000 shubhamsharma01/swiggy:latest
                 '''
             }
         }
